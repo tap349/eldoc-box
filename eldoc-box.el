@@ -131,8 +131,8 @@ This separator is used for the documentation shown in
     (internal-border-width . 1)
     (vertical-scroll-bars . nil)
     (horizontal-scroll-bars . nil)
-    (right-fringe . 3)
-    (left-fringe . 3)
+    (right-fringe . 8)
+    (left-fringe . 8)
     (menu-bar-lines . 0)
     (tool-bar-lines . 0)
     (line-spacing . 0)
@@ -206,11 +206,13 @@ See `eldoc-box-inhibit-display-when-moving'."
 (defvar eldoc-box--frame nil ;; A backstage variable
   "The frame to display doc.")
 
+;; Delete frame like in eldoc-box--disable
 (defun eldoc-box-quit-frame ()
   "Hide documentation childframe."
   (interactive)
   (when (and eldoc-box--frame (frame-live-p eldoc-box--frame))
-    (make-frame-invisible eldoc-box--frame t)))
+    (delete-frame eldoc-box--frame)
+    (setq eldoc-box--frame nil)))
 
 (defun eldoc-box--enable ()
   "Enable eldoc-box hover.
@@ -271,6 +273,13 @@ If (point) != last point, cleanup frame.")
          (buffer-string))))
     (setq eldoc-box--help-at-point-last-point (point))
     (run-with-timer 0.1 nil #'eldoc-box--help-at-point-cleanup)))
+
+(defun eldoc-box-toggle-help-at-point ()
+  "Toggle documentation of the symbol at point."
+  (interactive)
+  (if (and eldoc-box--frame (frame-live-p eldoc-box--frame))
+      (eldoc-box-quit-frame)
+    (eldoc-box-help-at-point)))
 
 ;;;; Backstage
 ;;;;; Variable
@@ -754,6 +763,13 @@ This allows any change in childframe parameter to take effect."
 
 (with-eval-after-load 'tab-line
   (add-hook 'tab-line-mode-hook #'eldoc-box-reset-frame))
+
+;;;; Parent major mode
+
+(defvar eldoc-box--parent-major-mode nil)
+
+(defun eldoc-box--set-parent-major-mode (parent-major-mode)
+  (setq eldoc-box--parent-major-mode parent-major-mode))
 
 (provide 'eldoc-box)
 
