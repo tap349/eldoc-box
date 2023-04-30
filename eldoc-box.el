@@ -312,9 +312,9 @@ childframe."
       (while (setq prop (text-property-search-forward 'markdown-hr))
         (add-text-properties (prop-match-beginning prop)
                              (prop-match-end prop)
-                             '( display (space :width text)
-                                face ( :strike-through t
-                                       :height 0.4)))))))
+                             '(display (space :width text)
+                               face (:strike-through t
+                                     :height 0.5)))))))
 
 (defun eldoc-box--replace-en-space ()
   "Display the en spaces in documentation as regular spaces."
@@ -330,7 +330,7 @@ height."
   (save-excursion
     (goto-char (point-min))
     (while (re-search-forward
-            (rx (>= 2 (or "\n"
+            (rx (>= 3 (or "\n"
                           (seq bol "```" (* (syntax word)) "\n")
                           (seq (+ "<br>") "\n")
                           (seq bol (+ (or " " "\t" " ")) "\n"))))
@@ -340,8 +340,8 @@ height."
           (replace-match "")
         (replace-match "\n\n")
         (add-text-properties (1- (point)) (point)
-                             '( font-lock-face (:height 0.4)
-                                face (:height 0.4)))))))
+                             '(font-lock-face (:height 0.5)
+                               face (:height 0.5)))))))
 
 (defun eldoc-box--remove-linked-images ()
   "Some documentation embed image links in the doc...remove them."
