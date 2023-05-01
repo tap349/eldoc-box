@@ -150,10 +150,12 @@ If (point) != last point, cleanup frame.")
   (interactive)
   (when (boundp 'eldoc--doc-buffer)
     (let ((eldoc-box-position-function
-           #'eldoc-box--default-at-point-position-function))
-      (eldoc-box--display
-       (with-current-buffer eldoc--doc-buffer
-         (buffer-string))))
+           #'eldoc-box--default-at-point-position-function)
+          (str (with-current-buffer eldoc--doc-buffer
+                 (buffer-string))))
+      (if (or (not str) (string= "" str))
+          (error "Docs not found")
+        (eldoc-box--display str)))
     (setq eldoc-box--help-at-point-last-point (point))
     (run-with-timer 0.1 nil #'eldoc-box--help-at-point-cleanup)))
 
@@ -314,7 +316,7 @@ childframe."
                              (prop-match-end prop)
                              '(display (space :width text)
                                face (:strike-through t
-                                     :height 0.5)))))))
+                                     :height 1.5)))))))
 
 (defun eldoc-box--replace-en-space ()
   "Display the en spaces in documentation as regular spaces."
@@ -375,8 +377,8 @@ height."
             nil t)
       (add-text-properties (match-beginning 2)
                            (match-end 2)
-                           '( face (:weight bold)
-                              font-lock-face (:weight bold)))
+                           '(face (:weight bold)
+                             font-lock-face (:weight bold)))
       (put-text-property (match-beginning 1) (match-end 1)
                          'invisible t)
       (put-text-property (match-beginning 3) (match-end 3)
