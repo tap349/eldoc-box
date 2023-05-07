@@ -32,6 +32,7 @@
 ;;; - remove compatibility with company and tab-bar modes
 ;;; - allow to set parent major mode
 ;;; - add eldoc-box-toggle-help-at-point
+;;; - add eldoc-box-eglot-toggle-help-at-point (legacy Eglot helper)
 
 ;;; Code:
 
@@ -100,7 +101,7 @@ Set it to a function with no argument
 if you want to dynamically change the maximum height."
   :type 'number)
 
-(defvar eldoc-box-position-function nil
+(defvar eldoc-box-position-function #'eldoc-box--default-at-point-position-function
   "Eldoc-box uses this function to set childframe's position.
 This should be a function that returns a (X . Y) cons cell.
 It will be passes with two arguments: WIDTH and HEIGHT of the childframe.")
@@ -149,10 +150,7 @@ If (point) != last point, cleanup frame.")
   "Display documentation of the symbol at point."
   (interactive)
   (when (boundp 'eldoc--doc-buffer)
-    (let ((eldoc-box-position-function
-           #'eldoc-box--default-at-point-position-function)
-          (str (with-current-buffer eldoc--doc-buffer
-                 (buffer-string))))
+    (let ((str (with-current-buffer eldoc--doc-buffer (buffer-string))))
       (if (or (not str) (string= "" str))
           (error "Docs not found")
         (eldoc-box--display str)))
@@ -187,7 +185,6 @@ STR has to be a proper documentation, not empty string, not nil, etc."
       (visual-line-mode)
       (run-hook-with-args 'eldoc-box-buffer-hook))
     (eldoc-box--get-frame doc-buffer)))
-
 
 (defun eldoc-box--point-position-relative-to-native-frame (&optional point window)
   "Return (X . Y) as the coordinate of POINT in WINDOW.
@@ -394,7 +391,7 @@ height."
                            ("&nbsp;" " "))))))
 
 ;;------------------------------------------------------------------------------
-;; My functions
+;; My modifications
 ;;------------------------------------------------------------------------------
 
 (defun eldoc-box-toggle-help-at-point ()
@@ -408,8 +405,49 @@ height."
 
 (defvar eldoc-box--parent-major-mode nil)
 
-(defun eldoc-box--set-parent-major-mode (parent-major-mode)
+(defun eldoc-box-set-parent-major-mode (parent-major-mode)
   (setq eldoc-box--parent-major-mode parent-major-mode))
+
+;; Eglot helper based on eglot-hover-eldoc-function from eglot.el
+
+(eval-and-compile
+  (when (require 'eglot nil t)
+    (require 'jsonrpc)
+    (declare-function eglot--TextDocumentPositionParams "eglot.el")
+    (declare-function eglot--current-server-or-lose "eglot.el")
+    (declare-function eglot--hover-info "eglot.el")
+    (declare-function eglot--lambda "eglot.el")
+    (declare-function eglot--server-capable "eglot.el")
+    (declare-function eglot--when-buffer-window "eglot.el")
+    (declare-function jsonrpc-async-request "jsonrpc")
+
+    (defun eldoc-box-eglot-toggle-help-at-point ()
+      "Toggle documentation of the symbol at point."
+      (interactive)
+      (if (and eldoc-box--frame (frame-live-p eldoc-box--frame))
+          (eldoc-box-quit-frame)
+        (eldoc-box-eglot-help-at-point)))
+
+    ;; Don't eglot--error function - it causes "error in process filter"
+    ;; and freezes cursor for a while
+    (defun eldoc-box-eglot-help-at-point ()
+      "Display documentation of the symbol at point."
+      (interactive)
+      (when (eglot--server-capable :hoverProvider)
+        (let ((buf (current-buffer)))
+          (jsonrpc-async-request
+           (eglot--current-server-or-lose)
+           :textDocument/hover (eglot--TextDocumentPositionParams)
+           :success-fn (eglot--lambda ((Hover) contents range)
+                         (eglot--when-buffer-window buf
+                           (let ((info (unless (seq-empty-p contents)
+                                         (eglot--hover-info contents range))))
+                             (if info
+                                 (eldoc-box--display info)
+                               (message "No hover info here")))))
+           :deferred :textDocument/hover))
+        (setq eldoc-box--help-at-point-last-point (point))
+        (run-with-timer 0.1 nil #'eldoc-box--help-at-point-cleanup)))))
 
 (provide 'eldoc-box)
 
