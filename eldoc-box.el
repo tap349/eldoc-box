@@ -417,7 +417,7 @@ height."
     (declare-function eglot--current-server-or-lose "eglot.el")
     (declare-function eglot--hover-info "eglot.el")
     (declare-function eglot--lambda "eglot.el")
-    (declare-function eglot--server-capable "eglot.el")
+    (declare-function eglot-server-capable "eglot.el")
     (declare-function eglot--when-buffer-window "eglot.el")
     (declare-function jsonrpc-async-request "jsonrpc")
 
@@ -433,7 +433,7 @@ height."
     (defun eldoc-box-eglot-help-at-point ()
       "Display documentation of the symbol at point."
       (interactive)
-      (when (eglot--server-capable :hoverProvider)
+      (when (eglot-server-capable :hoverProvider)
         (let ((buf (current-buffer)))
           (jsonrpc-async-request
            (eglot--current-server-or-lose)
