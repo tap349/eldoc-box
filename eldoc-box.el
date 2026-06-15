@@ -235,8 +235,6 @@ base on WIDTH and HEIGHT of childframe text window."
          (y (cdr pos)))
     (cons x y)))
 
-(defvar eldoc-box--markdown-separator-display-props)
-
 (defun eldoc-box--update-childframe-geometry (frame window)
   "Update the size and the position of childframe.
 FRAME is the childframe, WINDOW is the primary window."
@@ -254,7 +252,12 @@ FRAME is the childframe, WINDOW is the primary window."
   ;; small before calling ‘window-text-pixel-size’ works, but brings
   ;; other problems. Now we just set the display property to nil
   ;; before calling ‘window-text-pixel-size’, and set them back after.
-  (setcdr eldoc-box--markdown-separator-display-props nil)
+  ;;
+  ;; This workaround still doesn’t work all the time, and the problem
+  ;; can be avoided by simply not using the display property for
+  ;; markdown prettifier and rather use (:extend t) face attribute.
+  ;; But let’s keep the comment in case someone does something similar
+  ;; in the future.
   (let* ((size
           (window-text-pixel-size
            window nil nil
@@ -267,8 +270,6 @@ FRAME is the childframe, WINDOW is the primary window."
          (frame-resize-pixelwise t)
          (pos (funcall eldoc-box-position-function width height)))
     (set-frame-size frame width height t)
-    ;; Set the display property back.
-    (setcdr eldoc-box--markdown-separator-display-props '(:width text))
     ;; move position
     (set-frame-position frame (car pos) (cdr pos))))
 
@@ -314,12 +315,6 @@ Checkout `lsp-ui-doc--make-frame', `lsp-ui-doc--move-frame'."
 
 ;;;; Markdown compatibility
 
-(defvar-local eldoc-box--markdown-separator-display-props '(space :width text)
-  "Stores the display text property applied to markdown separators.
-
-Due to a bug, in ‘eldoc-box--update-childframe-geometry’, we
-modify the display property temporarily and then set it back.")
-
 (defun eldoc-box--prettify-markdown-separator ()
   "Prettify the markdown separator in doc returned by Eglot.
 Refontify the separator so they span exactly the width of the
@@ -328,10 +323,15 @@ childframe."
     (goto-char (point-min))
     (let (prop)
       (while (setq prop (text-property-search-forward 'markdown-hr))
-        (add-text-properties (prop-match-beginning prop)
-                             (prop-match-end prop)
-                             `(display ,eldoc-box--markdown-separator-display-props
-                               face eldoc-box-markdown-separator))))))
+        (let* ((beg (prop-match-beginning prop))
+               (end (prop-match-end prop))
+               (end-plus-newline (save-excursion
+                                   (goto-char end)
+                                   (min (1+ (line-end-position))
+                                        (point-max)))))
+          (add-text-properties beg end '(display " "))
+          (add-text-properties beg end-plus-newline
+                               '(face eldoc-box-markdown-separator)))))))
 
 (defun eldoc-box--replace-en-space ()
   "Display the en spaces in documentation as regular spaces."
@@ -347,7 +347,7 @@ height."
   (save-excursion
     (goto-char (point-min))
     (while (re-search-forward
-            (rx (>= 3 (or "\n"
+            (rx (>= 2 (or "\n"
                           (seq bol "```" (* (syntax word)) "\n")
                           (seq (+ "<br>") "\n")
                           (seq bol (+ (or " " "\t" " ")) "\n"))))
@@ -357,8 +357,8 @@ height."
           (replace-match "")
         (replace-match "\n\n")
         (add-text-properties (1- (point)) (point)
-                             '(font-lock-face (:height 0.5)
-                               face (:height 0.5)))))))
+                             '(font-lock-face (:height 0.4)
+                               face (:height 0.4)))))))
 
 (defun eldoc-box--remove-linked-images ()
   "Some documentation embed image links in the doc...remove them."
