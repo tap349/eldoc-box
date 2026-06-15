@@ -55,6 +55,11 @@
 (defface eldoc-box-body '((t . nil))
   "Body face used in documentation childframe.")
 
+(defface eldoc-box-markdown-separator '((t . (:strike-through t
+                                               :extend t
+                                               :height 0.4)))
+  "Face for the separator line in Markdown.")
+
 (defvar eldoc-box-frame-parameters
   '(;; make the childframe unseen when first created
     (left . -1)
@@ -230,6 +235,8 @@ base on WIDTH and HEIGHT of childframe text window."
          (y (cdr pos)))
     (cons x y)))
 
+(defvar eldoc-box--markdown-separator-display-props)
+
 (defun eldoc-box--update-childframe-geometry (frame window)
   "Update the size and the position of childframe.
 FRAME is the childframe, WINDOW is the primary window."
@@ -237,13 +244,17 @@ FRAME is the childframe, WINDOW is the primary window."
   ;; property of (space :width text) -- which is what we apply onto
   ;; markdown separators -- ‘window-text-pixel-size’ wouldn’t return
   ;; the correct value. Instead, it returns the current window width.
-  ;; So now the childram only grows in size and never shrinks. For
-  ;; whatever reason, if we set the frame size very small before
-  ;; calculating window’s text size, it can return the right value.
+  ;; So now the childframe only grows in size and never shrinks.
+  ;;
   ;; (My guess is that the function takes (space :width text) at face
   ;; value, but that can’t be the whole picture because it works fine
   ;; when I manually evaluate the function in the childframe...)
-  (set-frame-size frame 1 1 t)
+  ;;
+  ;; The original workaround of setting the frame size to something
+  ;; small before calling ‘window-text-pixel-size’ works, but brings
+  ;; other problems. Now we just set the display property to nil
+  ;; before calling ‘window-text-pixel-size’, and set them back after.
+  (setcdr eldoc-box--markdown-separator-display-props nil)
   (let* ((size
           (window-text-pixel-size
            window nil nil
@@ -256,6 +267,8 @@ FRAME is the childframe, WINDOW is the primary window."
          (frame-resize-pixelwise t)
          (pos (funcall eldoc-box-position-function width height)))
     (set-frame-size frame width height t)
+    ;; Set the display property back.
+    (setcdr eldoc-box--markdown-separator-display-props '(:width text))
     ;; move position
     (set-frame-position frame (car pos) (cdr pos))))
 
@@ -301,6 +314,12 @@ Checkout `lsp-ui-doc--make-frame', `lsp-ui-doc--move-frame'."
 
 ;;;; Markdown compatibility
 
+(defvar-local eldoc-box--markdown-separator-display-props '(space :width text)
+  "Stores the display text property applied to markdown separators.
+
+Due to a bug, in ‘eldoc-box--update-childframe-geometry’, we
+modify the display property temporarily and then set it back.")
+
 (defun eldoc-box--prettify-markdown-separator ()
   "Prettify the markdown separator in doc returned by Eglot.
 Refontify the separator so they span exactly the width of the
@@ -311,9 +330,8 @@ childframe."
       (while (setq prop (text-property-search-forward 'markdown-hr))
         (add-text-properties (prop-match-beginning prop)
                              (prop-match-end prop)
-                             '(display (space :width text)
-                               face (:strike-through t
-                                     :height 1.5)))))))
+                             `(display ,eldoc-box--markdown-separator-display-props
+                               face eldoc-box-markdown-separator))))))
 
 (defun eldoc-box--replace-en-space ()
   "Display the en spaces in documentation as regular spaces."
