@@ -323,22 +323,32 @@ childframe."
     (goto-char (point-min))
     (let (prop)
       (while (setq prop (text-property-search-forward 'markdown-hr))
-        (let* ((beg (prop-match-beginning prop))
-               (end (prop-match-end prop))
-               (beg-marker (copy-marker beg))
-               (end-marker (copy-marker end))
-               (end-plus-newline (save-excursion
-                                   (goto-char end)
-                                   (min (1+ (line-end-position))
-                                        (point-max))))
-               (end-plus-newline-marker (copy-marker end-plus-newline)))
-          (eldoc-box--remove-blank-lines-around beg-marker)
-          (add-text-properties beg-marker end-marker '(display " "))
-          (add-text-properties beg-marker end-plus-newline-marker
-                               '(face eldoc-box-markdown-separator))
-          (set-marker beg-marker nil)
-          (set-marker end-marker nil)
-          (set-marker end-plus-newline-marker nil))))))
+        (eldoc-box--prettify-markdown-separator-at
+         (prop-match-beginning prop)))))
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward
+            (rx bol (* (or " " "\t"))
+                (or (>= 3 "-") (>= 3 "*") (>= 3 "_"))
+                (* (or " " "\t")) eol)
+            nil t)
+      (unless (get-text-property (match-beginning 0) 'markdown-hr)
+        (eldoc-box--prettify-markdown-separator-at (match-beginning 0))))))
+
+(defun eldoc-box--prettify-markdown-separator-at (pos)
+  "Prettify the Markdown separator line at POS."
+  (let ((pos-marker (copy-marker pos)))
+    (eldoc-box--remove-blank-lines-around pos-marker)
+    (save-excursion
+      (goto-char pos-marker)
+      (let ((beg (line-beginning-position))
+            (end (line-end-position))
+            (end-plus-newline (min (line-beginning-position 2)
+                                   (point-max))))
+        (add-text-properties beg end '(display " "))
+        (add-text-properties beg end-plus-newline
+                             '(face eldoc-box-markdown-separator))))
+    (set-marker pos-marker nil)))
 
 (defun eldoc-box--remove-blank-lines-around (pos)
   "Remove blank lines directly before and after the line at POS."
