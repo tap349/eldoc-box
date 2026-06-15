@@ -323,48 +323,15 @@ childframe."
     (goto-char (point-min))
     (let (prop)
       (while (setq prop (text-property-search-forward 'markdown-hr))
-        (eldoc-box--prettify-markdown-separator-at
-         (prop-match-beginning prop)))))
-  (save-excursion
-    (goto-char (point-min))
-    (while (re-search-forward
-            (rx bol (* (or " " "\t"))
-                (or (>= 3 "-") (>= 3 "*") (>= 3 "_"))
-                (* (or " " "\t")) eol)
-            nil t)
-      (unless (get-text-property (match-beginning 0) 'markdown-hr)
-        (eldoc-box--prettify-markdown-separator-at (match-beginning 0))))))
-
-(defun eldoc-box--prettify-markdown-separator-at (pos)
-  "Prettify the Markdown separator line at POS."
-  (let ((pos-marker (copy-marker pos)))
-    (eldoc-box--remove-blank-lines-around pos-marker)
-    (save-excursion
-      (goto-char pos-marker)
-      (let ((beg (line-beginning-position))
-            (end (line-end-position))
-            (end-plus-newline (min (line-beginning-position 2)
-                                   (point-max))))
-        (add-text-properties beg end '(display " "))
-        (add-text-properties beg end-plus-newline
-                             '(face eldoc-box-markdown-separator))))
-    (set-marker pos-marker nil)))
-
-(defun eldoc-box--remove-blank-lines-around (pos)
-  "Remove blank lines directly before and after the line at POS."
-  (save-excursion
-    (goto-char pos)
-    (beginning-of-line)
-    (while (and (not (bobp))
-                (save-excursion
-                  (forward-line -1)
-                  (looking-at-p (rx (* (or " " "\t" " ")) eol))))
-      (forward-line -1)
-      (delete-region (line-beginning-position) (line-beginning-position 2)))
-    (forward-line 1)
-    (while (and (not (eobp))
-                (looking-at-p (rx (* (or " " "\t" " ")) eol)))
-      (delete-region (line-beginning-position) (line-beginning-position 2)))))
+        (let* ((beg (prop-match-beginning prop))
+               (end (prop-match-end prop))
+               (end-plus-newline (save-excursion
+                                   (goto-char end)
+                                   (min (1+ (line-end-position))
+                                        (point-max)))))
+          (add-text-properties beg end '(display " "))
+          (add-text-properties beg end-plus-newline
+                               '(face eldoc-box-markdown-separator)))))))
 
 (defun eldoc-box--replace-en-space ()
   "Display the en spaces in documentation as regular spaces."
