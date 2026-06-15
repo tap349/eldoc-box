@@ -325,13 +325,36 @@ childframe."
       (while (setq prop (text-property-search-forward 'markdown-hr))
         (let* ((beg (prop-match-beginning prop))
                (end (prop-match-end prop))
+               (beg-marker (copy-marker beg))
+               (end-marker (copy-marker end))
                (end-plus-newline (save-excursion
                                    (goto-char end)
                                    (min (1+ (line-end-position))
-                                        (point-max)))))
-          (add-text-properties beg end '(display " "))
-          (add-text-properties beg end-plus-newline
-                               '(face eldoc-box-markdown-separator)))))))
+                                        (point-max))))
+               (end-plus-newline-marker (copy-marker end-plus-newline)))
+          (eldoc-box--remove-blank-lines-around beg-marker)
+          (add-text-properties beg-marker end-marker '(display " "))
+          (add-text-properties beg-marker end-plus-newline-marker
+                               '(face eldoc-box-markdown-separator))
+          (set-marker beg-marker nil)
+          (set-marker end-marker nil)
+          (set-marker end-plus-newline-marker nil))))))
+
+(defun eldoc-box--remove-blank-lines-around (pos)
+  "Remove blank lines directly before and after the line at POS."
+  (save-excursion
+    (goto-char pos)
+    (beginning-of-line)
+    (while (and (not (bobp))
+                (save-excursion
+                  (forward-line -1)
+                  (looking-at-p (rx (* (or " " "\t" " ")) eol))))
+      (forward-line -1)
+      (delete-region (line-beginning-position) (line-beginning-position 2)))
+    (forward-line 1)
+    (while (and (not (eobp))
+                (looking-at-p (rx (* (or " " "\t" " ")) eol)))
+      (delete-region (line-beginning-position) (line-beginning-position 2)))))
 
 (defun eldoc-box--replace-en-space ()
   "Display the en spaces in documentation as regular spaces."
